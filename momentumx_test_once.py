@@ -1,39 +1,41 @@
 
-import time
-import hmac
-import hashlib
-import requests
 import os
+import requests
+import time
 
-API_KEY = os.getenv("API_KEY")
-API_SECRET = os.getenv("API_SECRET")
+api_key = os.getenv("API_KEY")
+api_secret = os.getenv("API_SECRET")
+telegram_token = os.getenv("TELEGRAM_BOT_TOKEN")
+telegram_chat_id = os.getenv("TELEGRAM_CHAT_ID")
 
-def sign(params):
-    query_string = "&".join([f"{key}={value}" for key, value in sorted(params.items())])
-    signature = hmac.new(bytes(API_SECRET, "utf-8"), query_string.encode("utf-8"), hashlib.sha256).hexdigest()
-    return signature
+def send_telegram(msg):
+    url = f"https://api.telegram.org/bot{telegram_token}/sendMessage"
+    data = {"chat_id": telegram_chat_id, "text": msg}
+    requests.post(url, data=data)
 
-def place_order(symbol, side, qty, price):
-    url = "https://api.bybit.com/v5/order/create"
-    timestamp = str(int(time.time() * 1000))
-    params = {
-        "apiKey": API_KEY,
-        "symbol": symbol,
-        "side": side,
-        "orderType": "LIMIT",
-        "qty": str(qty),
-        "price": str(price),
-        "timeInForce": "GTC",
-        "timestamp": timestamp
+def test_order():
+    send_telegram("🧪 MomentumX: TEST beginnt")
+
+    # Simulierter Test-Buy
+    print("MomentumX: Starte Test-Buy...")
+    result_buy = {
+        "retCode": 10001,
+        "retMsg": "TEST: Buy Order simuliert"
     }
-    params["sign"] = sign(params)
-    response = requests.post(url, data=params)
-    print(response.text)
+    send_telegram(f"📩 TEST-ORDER Buy → {result_buy}")
+
+    # Kurze Pause
+    time.sleep(1)
+
+    # Simulierter Test-Sell
+    print("MomentumX: Starte Test-Sell...")
+    result_sell = {
+        "retCode": 10001,
+        "retMsg": "TEST: Sell Order simuliert"
+    }
+    send_telegram(f"📤 TEST-ORDER Sell → {result_sell}")
+
+    send_telegram("✅ MomentumX TEST abgeschlossen")
 
 if __name__ == "__main__":
-    print("MomentumX: Starte Test-Buy...")
-    place_order("BTCUSDT", "Buy", 0.001, 11000)
-    time.sleep(10)
-    print("MomentumX: Starte Test-Sell...")
-    place_order("BTCUSDT", "Sell", 0.001, 11100)
-    print("MomentumX: Test abgeschlossen.")
+    test_order()
