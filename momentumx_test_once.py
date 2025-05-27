@@ -3,7 +3,7 @@ from pybit.unified_trading import HTTP
 import time
 import requests
 
-# ENV Variablen aus Render
+# ENV Variablen
 api_key = os.getenv("API_KEY")
 api_secret = os.getenv("API_SECRET")
 telegram_token = os.getenv("TELEGRAM_BOT_TOKEN")
@@ -18,12 +18,12 @@ def send_telegram(msg):
     })
 
 def get_price(symbol):
-    response = session.get_ticker_price(category="spot", symbol=symbol)
-    return float(response["result"]["price"])
+    ticker = session.get_tickers(category="spot", symbol=symbol)
+    return float(ticker["result"]["list"][0]["lastPrice"])
 
 def test_trade(symbol="BTCUSDT", amount_usdt=10):
     send_telegram("🧪 MomentumX: TEST beginnt")
-    
+
     try:
         price = get_price(symbol)
         qty = round(amount_usdt / price, 6)
