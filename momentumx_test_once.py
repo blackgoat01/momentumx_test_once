@@ -17,28 +17,27 @@ def send_telegram(msg):
         "text": msg
     })
 
-def get_price(symbol):
-    ticker = session.get_tickers(category="spot", symbol=symbol)
-    return float(ticker["result"]["list"][0]["lastPrice"])
-
-def test_trade(symbol="BTCUSDT", amount_usdt=10):
+def test_usdt_order(symbol="BTCUSDT", usdt_amount=10):
     send_telegram("🧪 MomentumX: TEST beginnt")
 
     try:
-        price = get_price(symbol)
-        qty = round(amount_usdt / price, 6)
-
+        # Buy mit festem USDT-Betrag
         buy = session.place_order(
             category="spot",
             symbol=symbol,
             side="Buy",
             order_type="Market",
-            qty=qty
+            order_amt=usdt_amount
         )
-        send_telegram(f"📩 LIVE-ORDER Buy {qty} {symbol} @ {price} USDT → {buy}")
+        send_telegram(f"📩 LIVE-ORDER Buy {usdt_amount} USDT → {buy}")
 
-        time.sleep(3)
+        time.sleep(5)
 
+        # Letzter Preis holen
+        price = float(session.get_tickers(category="spot", symbol=symbol)["result"]["list"][0]["lastPrice"])
+        qty = round(usdt_amount / price, 6)
+
+        # Sell nach Menge (nicht USDT)
         sell = session.place_order(
             category="spot",
             symbol=symbol,
@@ -46,7 +45,7 @@ def test_trade(symbol="BTCUSDT", amount_usdt=10):
             order_type="Market",
             qty=qty
         )
-        send_telegram(f"📤 LIVE-ORDER Sell {qty} {symbol} @ {price} USDT → {sell}")
+        send_telegram(f"📤 LIVE-ORDER Sell {qty} {symbol} → {sell}")
 
     except Exception as e:
         send_telegram(f"❌ Fehler: {str(e)}")
@@ -54,4 +53,4 @@ def test_trade(symbol="BTCUSDT", amount_usdt=10):
     send_telegram("✅ MomentumX TEST abgeschlossen")
 
 # Start
-test_trade()
+test_usdt_order()
