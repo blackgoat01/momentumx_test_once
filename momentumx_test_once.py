@@ -3,56 +3,55 @@ from pybit.unified_trading import HTTP
 import time
 import requests
 
-# Umrechnung USDT-Betrag zu BTC bei Marktpreis (für ca. 10 €)
-USDT_AMOUNT = 10
+# ENV Variablen aus Render
+api_key = os.getenv("API_KEY")
+api_secret = os.getenv("API_SECRET")
+telegram_token = os.getenv("TELEGRAM_BOT_TOKEN")
+telegram_chat_id = os.getenv("TELEGRAM_CHAT_ID")
 
-# Umgebungsvariablen abrufen
-API_KEY = os.getenv("API_KEY")
-API_SECRET = os.getenv("API_SECRET")
-TG_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
-TG_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
+session = HTTP(api_key=api_key, api_secret=api_secret)
 
-# Bybit-Session erstellen
-session = HTTP(api_key=API_KEY, api_secret=API_SECRET)
+def send_telegram(msg):
+    requests.get(f"https://api.telegram.org/bot{telegram_token}/sendMessage", params={
+        "chat_id": telegram_chat_id,
+        "text": msg
+    })
 
-# Telegram-Funktion
-def send_telegram(message):
-    url = f"https://api.telegram.org/bot{TG_TOKEN}/sendMessage"
-    data = {"chat_id": TG_CHAT_ID, "text": message}
-    requests.post(url, data=data)
+def get_price(symbol):
+    response = session.get_ticker_price(category="spot", symbol=symbol)
+    return float(response["result"]["price"])
 
-try:
-    # Preis abrufen
-    ticker = session.get_ticker(category="linear", symbol="BTCUSDT")
-    btc_price = float(ticker['result']['list'][0]['lastPrice'])
-    qty = round(USDT_AMOUNT / btc_price, 6)
+def test_trade(symbol="BTCUSDT", amount_usdt=10):
+    send_telegram("🧪 MomentumX: TEST beginnt")
+    
+    try:
+        price = get_price(symbol)
+        qty = round(amount_usdt / price, 6)
 
-    send_telegram("MomentumX: Starte LIVE-Kauf (10 €)...")
+        buy = session.place_order(
+            category="spot",
+            symbol=symbol,
+            side="Buy",
+            order_type="Market",
+            qty=qty
+        )
+        send_telegram(f"📩 LIVE-ORDER Buy {qty} {symbol} @ {price} USDT → {buy}")
 
-    # Kauf (Market)
-    buy = session.place_order(
-        category="linear",
-        symbol="BTCUSDT",
-        side="Buy",
-        order_type="Market",
-        qty=qty,
-        time_in_force="FillOrKill"
-    )
-    send_telegram(f"🟢 Live-Buy erfolgreich: {buy}")
+        time.sleep(3)
 
-    time.sleep(5)
+        sell = session.place_order(
+            category="spot",
+            symbol=symbol,
+            side="Sell",
+            order_type="Market",
+            qty=qty
+        )
+        send_telegram(f"📤 LIVE-ORDER Sell {qty} {symbol} @ {price} USDT → {sell}")
 
-    # Verkauf (Market)
-    sell = session.place_order(
-        category="linear",
-        symbol="BTCUSDT",
-        side="Sell",
-        order_type="Market",
-        qty=qty,
-        time_in_force="FillOrKill"
-    )
-    send_telegram(f"🔴 Live-Sell erfolgreich: {sell}")
+    except Exception as e:
+        send_telegram(f"❌ Fehler: {str(e)}")
 
-    send_telegram("✅ MomentumX LIVE-TEST abgeschlossen.")
-except Exception as e:
-    send_telegram(f"❌ Fehler: {e}")
+    send_telegram("✅ MomentumX TEST abgeschlossen")
+
+# Start
+test_trade()
