@@ -3,54 +3,52 @@ from pybit.unified_trading import HTTP
 import time
 import requests
 
-# ENV Variablen
-api_key = os.getenv("API_KEY")
-api_secret = os.getenv("API_SECRET")
-telegram_token = os.getenv("TELEGRAM_BOT_TOKEN")
-telegram_chat_id = os.getenv("TELEGRAM_CHAT_ID")
+session = HTTP(
+    api_key=os.getenv("API_KEY"),
+    api_secret=os.getenv("API_SECRET")
+)
 
-session = HTTP(api_key=api_key, api_secret=api_secret)
+symbol = "BTCUSDT"
+usdt_einsatz = 10
 
 def send_telegram(msg):
-    requests.get(f"https://api.telegram.org/bot{telegram_token}/sendMessage", params={
-        "chat_id": telegram_chat_id,
-        "text": msg
-    })
+    bot_token = os.getenv("TELEGRAM_BOT_TOKEN")
+    chat_id = os.getenv("TELEGRAM_CHAT_ID")
+    url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
+    payload = {"chat_id": chat_id, "text": msg}
+    requests.post(url, json=payload)
 
-def test_usdt_order(symbol="BTCUSDT", usdt_amount=10):
+try:
     send_telegram("🧪 MomentumX: TEST beginnt")
+    
+    # Marktpreis-Kauf für 10 USDT
+    buy = session.place_order(
+        category="spot",
+        symbol=symbol,
+        side="Buy",
+        order_type="Market",
+        quoteOrderQty=usdt_einsatz
+    )
+    send_telegram(f"📩 TEST-BUY → {buy}")
+    time.sleep(7)
 
-    try:
-        # Buy mit festem USDT-Betrag
-        buy = session.place_order(
-            category="spot",
-            symbol=symbol,
-            side="Buy",
-            order_type="Market",
-            order_amt=usdt_amount
-        )
-        send_telegram(f"📩 LIVE-ORDER Buy {usdt_amount} USDT → {buy}")
+    # Letzte Orderdaten holen, Menge auslesen
+    fills = session.get_execution_list(category="spot", symbol=symbol, limit=1)
+    qty = float(fills['result']['list'][0]['execQty']) if fills['result']['list'] else 0
 
-        time.sleep(5)
-
-        # Letzter Preis holen
-        price = float(session.get_tickers(category="spot", symbol=symbol)["result"]["list"][0]["lastPrice"])
-        qty = round(usdt_amount / price, 6)
-
-        # Sell nach Menge (nicht USDT)
+    if qty > 0:
         sell = session.place_order(
             category="spot",
             symbol=symbol,
             side="Sell",
             order_type="Market",
-            qty=qty
+            qty=round(qty, 6)
         )
-        send_telegram(f"📤 LIVE-ORDER Sell {qty} {symbol} → {sell}")
+        send_telegram(f"📤 TEST-SELL → {sell}")
+    else:
+        send_telegram("⚠️ Keine gültige Kaufmenge gefunden, Abbruch.")
 
-    except Exception as e:
-        send_telegram(f"❌ Fehler: {str(e)}")
+except Exception as e:
+    send_telegram(f"❌ Fehler: {str(e)}")
 
-    send_telegram("✅ MomentumX TEST abgeschlossen")
-
-# Start
-test_usdt_order()
+send_telegram("✅ MomentumX TEST abgeschlossen")
