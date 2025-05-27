@@ -1,76 +1,44 @@
 
 import os
-import requests
 import time
-from dotenv import load_dotenv
-
-# Telegram Setup
-TELEGRAM_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
-TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
-def send_telegram(msg):
-    requests.post(f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage", data={
-        "chat_id": TELEGRAM_CHAT_ID,
-        "text": msg
-    })
-
-# API Setup
-API_KEY = os.getenv("API_KEY")
-API_SECRET = os.getenv("API_SECRET")
-
 import hmac
 import hashlib
-import time
 import requests
-import json
+from dotenv import load_dotenv
 
-def get_signature(api_key, api_secret, req_time, sign_params=""):
-    param_str = str(req_time) + api_key + sign_params
-    hash = hmac.new(bytes(api_secret, "utf-8"), param_str.encode("utf-8"), hashlib.sha256)
-    return hash.hexdigest()
+load_dotenv()
 
-def place_market_buy_order(symbol, usdt_amount):
-    url = "https://api.bybit.com/v5/market/tickers?category=spot&symbol=" + symbol
-    try:
-        response = requests.get(url)
-        response.raise_for_status()
-        price = float(response.json()["result"]["list"][0]["lastPrice"])
-        qty = round(usdt_amount / price, 6)
-    except Exception as e:
-        send_telegram(f"❌ Fehler beim Abrufen des Preises: {e}")
-        return
+api_key = os.getenv("API_KEY")
+api_secret = os.getenv("API_SECRET")
 
-    # Order erstellen
-    endpoint = "https://api.bybit.com/v5/order/create"
-    req_time = str(int(time.time() * 1000))
-    body = {
+def create_signature(params, secret):
+    sorted_params = sorted(params.items())
+    query_string = "&".join([f"{key}={value}" for key, value in sorted_params])
+    return hmac.new(bytes(secret, "utf-8"), query_string.encode("utf-8"), hashlib.sha256).hexdigest()
+
+def send_test_order():
+    url = "https://api.bybit.com/v5/order/create"
+    timestamp = str(int(time.time() * 1000))
+
+    params = {
         "category": "spot",
-        "symbol": symbol,
+        "symbol": "BTCUSDT",
         "side": "Buy",
         "order_type": "Market",
-        "qty": str(qty)
-    }
-    body_str = json.dumps(body, separators=(",", ":"))
-    sign = get_signature(API_KEY, API_SECRET, req_time, body_str)
-
-    headers = {
-        "X-BAPI-API-KEY": API_KEY,
-        "X-BAPI-SIGN": sign,
-        "X-BAPI-TIMESTAMP": req_time,
-        "X-BAPI-RECV-WINDOW": "5000",
-        "Content-Type": "application/json"
+        "qty": "0.0005",
+        "timestamp": timestamp,
+        "api_key": api_key,
     }
 
-    try:
-        response = requests.post(endpoint, headers=headers, data=body_str)
-        send_telegram(f"📥 BUY ORDER → {response.text}")
-    except Exception as e:
-        send_telegram(f"❌ Fehler beim Platzieren der Buy-Order: {e}")
+    sign = create_signature(params, api_secret)
+    headers = {"Content-Type": "application/x-www-form-urlencoded"}
 
-def main():
-    send_telegram("🧪 MomentumX LIVE-TEST beginnt")
-    place_market_buy_order("BTCUSDT", 10)
-    send_telegram("✅ MomentumX LIVE-TEST abgeschlossen")
+    params["sign"] = sign
+    response = requests.post(url, data=params, headers=headers)
+    return response.json()
 
 if __name__ == "__main__":
-    main()
-    
+    print("🧪 MomentumX LIVE-TEST beginnt")
+    result = send_test_order()
+    print("📥 BUY ORDER →", result)
+    print("✅ MomentumX LIVE-TEST abgeschlossen")
